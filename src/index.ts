@@ -1,5 +1,6 @@
-const CANVAS_SIZE = 500;
+const CANVAS_SIZE = 800;
 const PARTICLE_SIZE = 5;
+const RES = 0.60;
 
 interface Particle {
   x: number;
@@ -39,7 +40,7 @@ const particle = (ctx: CanvasRenderingContext2D, x: number, y: number, color: st
 };
 
 const random = () => {
-  return Math.random() * 480;
+  return Math.random() * CANVAS_SIZE - 50;
 };
 
 const createGroup = (ctx: CanvasRenderingContext2D, n: number, color: string) => {
@@ -50,7 +51,7 @@ const createGroup = (ctx: CanvasRenderingContext2D, n: number, color: string) =>
   return group;
 };
 
-const force = (p1: Particle[], p2: Particle[], grav: number, fric: number) => {
+const force = (p1: Particle[], p2: Particle[], grav: number) => {
   for (let i = 0; i < p1.length; i++) {
     let fx = 0;
     let fy = 0;
@@ -70,8 +71,8 @@ const force = (p1: Particle[], p2: Particle[], grav: number, fric: number) => {
       }
     }
 
-    a.vx = (a.vx + fx) * fric;
-    a.vy = (a.vy + fy) * fric;
+    a.vx = (a.vx + fx) * RES;
+    a.vy = (a.vy + fy) * RES;
 
     a.x += a.vx;
     a.y += a.vy;
@@ -98,23 +99,27 @@ const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: () 
 
 const run = async () => {
   const ctx = getContext2D();
-  const yellow = createGroup(ctx, 300, 'yellow');
-  const red = createGroup(ctx, 300, 'red');
-  const green = createGroup(ctx, 200, 'green');
-  const purple = createGroup(ctx, 100, 'purple');
-  update(ctx, [...yellow, ...red, ...green, ...purple], () => {
-    force(red, red, -0.05, 0.5);
-    force(red, green, 0.08, 0.5);
-    force(red, purple, 0.02, 0.5);
-    force(yellow, red, 0.1, 0.5);
-    force(yellow, yellow, -0.001, 0.5);
-    force(yellow, green, 0.02, 0.5);
-    force(green, red, -0.05, 0.5);
-    force(green, green, 0.03, 0.5);
-    force(purple, red, -0.02, 0.5);
-    force(purple, yellow, 0.03, 0.5);
-    force(purple, green, -0.01, 0.5);
-    force(purple, purple, 0.02, 0.5);
+
+  const yellow = createGroup(ctx, 500, 'yellow');
+  const red = createGroup(ctx, 500, 'red');
+  const green = createGroup(ctx, 500, 'green');
+  const allParticles = [...yellow, ...red, ...green];
+
+  let change = false;
+
+  update(ctx, allParticles, () => {
+    force(red, green, 0.09);
+    force(green, red, 0.03);
+
+    force(yellow, red, -0.05);
+    force(red, yellow, change ? -0.08 : 0.05);
+
+    force(green, yellow, 0.09);
+    force(yellow, green, change ? -0.03 : 0.08);
+
+    force(green, green, 0.02);
+
+    change = Math.random() > 0.99;
   });
 };
 

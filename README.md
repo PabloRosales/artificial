@@ -3,6 +3,7 @@
 Simple artificial life experiments with Canvas and TS.
 
 ![sample](./sample.gif)
+![sample 2](./sample-2.gif)
 
 ## Inspiration
 
