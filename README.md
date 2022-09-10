@@ -2,6 +2,8 @@
 
 Simple artificial life experiments with Canvas and TS.
 
+See live versions at [artificial](https://pablorosales.github.io/artificial/).
+
 #### Gifs
 
 See [here](./samples) for GIFs on different versions.
