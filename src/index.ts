@@ -14,6 +14,7 @@ interface Particle {
   energy: number;
   nutrient: number;
   reproduce: number;
+  children: number;
 }
 
 const getContext2D = (): CanvasRenderingContext2D => {
@@ -44,7 +45,7 @@ const createParticle = (ctx: CanvasRenderingContext2D, particle: Omit<Particle, 
 };
 
 const randomWalk = () => {
-  return Math.random() * 2 - 1;
+  return Math.random() * 0.5 - 0.25;
 };
 
 const random = (area: number) => {
@@ -65,6 +66,7 @@ const createGroup = (ctx: CanvasRenderingContext2D, startPoint: number, n: numbe
         alive: true,
         nutrient: 1,
         reproduce: 0,
+        children: 0,
         size: START_PARTICLE_SIZE,
       }),
     );
@@ -72,173 +74,190 @@ const createGroup = (ctx: CanvasRenderingContext2D, startPoint: number, n: numbe
   return group;
 };
 
-const avoids = (p1: Particle[], p2: Particle[]) => {
-  for (let i = 0; i < p1.length; i++) {
-    const a = p1[i];
+const avoids = (a: Particle, p2: Particle[]) => {
+  if (!a.alive) {
+    return;
+  }
 
-    if (!a.alive) {
+  let fx = 0;
+  let fy = 0;
+  let foundCandidates = false;
+
+  for (let j = 0; j < p2.length; j++) {
+    const b = p2[j];
+
+    if (a.id === b.id || !b.alive || a.color === b.color || b.nutrient <= 0.3) {
       continue;
     }
 
-    let fx = 0;
-    let fy = 0;
+    foundCandidates = true;
 
-    for (let j = 0; j < p2.length; j++) {
-      const b = p2[j];
+    a.x += randomWalk();
+    a.y += randomWalk();
 
-      if (a.id === b.id || !b.alive) {
-        continue;
-      }
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > a.size * 10) {
-        a.energy += 0.02;
-      } else if (distance < a.size * 2) {
-        a.energy -= 0.05;
-      }
-
-      if (a.energy < 0) {
-        a.energy = 0.01;
-      } else if (a.energy > 1) {
-        a.energy = 0.99;
-      }
-
-      const grav = -a.energy;
-      if (distance > 0 && distance < a.size * 5) {
-        const F = grav * (1 / distance);
-        fx += F * dx;
-        fy += F * dy;
-      }
+    if (distance > a.size * 10) {
+      a.energy += 0.02;
+    } else if (distance < a.size * 2) {
+      a.energy -= 0.05;
     }
 
-    a.vx = (a.vx + fx) * 0.6;
-    a.vy = (a.vy + fy) * 0.6;
+    if (a.energy < 0) {
+      a.energy = 0.01;
+    } else if (a.energy > 1) {
+      a.energy = 0.99;
+    }
+
+    const grav = -a.energy;
+    if (distance > 0 && distance < a.size * 5) {
+      const F = grav * (1 / distance);
+      fx += F * dx;
+      fy += F * dy;
+    }
+  }
+
+  let speed = 0.5;
+  if (a.nutrient > 0.8) {
+    speed = 0.8;
+  }
+
+  if (foundCandidates) {
+    a.vx = (a.vx + fx) * speed;
+    a.vy = (a.vy + fy) * speed;
 
     if (a.nutrient <= 0.3) {
       a.vx *= 0.8;
       a.vy *= 0.8;
     }
 
-    a.x += a.vx + randomWalk();
-    a.y += a.vy + randomWalk();
+    a.x += a.vx;
+    a.y += a.vy;
+  }
 
-    if (a.x <= 0 || a.x >= CANVAS_SIZE - a.size) {
-      a.vx *= -1;
-    }
+  if (a.x <= 0 || a.x >= CANVAS_SIZE - a.size) {
+    a.vx *= -1;
+  }
 
-    if (a.y <= 0 || a.y >= CANVAS_SIZE - a.size) {
-      a.vy *= -1;
-    }
+  if (a.y <= 0 || a.y >= CANVAS_SIZE - a.size) {
+    a.vy *= -1;
   }
 };
 
-const reproduce = (p1: Particle[], p2: Particle[]): Particle[] => {
+const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
   const newParticles: Particle[] = [];
 
-  for (let i = 0; i < p1.length; i++) {
-    const a = p1[i];
+  if (!a.alive || a.children > 3) {
+    return newParticles;
+  }
 
-    if (!a.alive) {
+  for (let j = 0; j < p2.length; j++) {
+    const b = p2[j];
+    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient <= 0.5) {
       continue;
     }
 
-    for (let j = 0; j < p2.length; j++) {
-      const b = p2[j];
-      if (a.id === b.id || !b.alive) {
-        continue;
-      }
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
 
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const d = Math.sqrt(dx * dx + dy * dy);
-
-      if (d <= a.size * 1.5 && a.nutrient > 0.5) {
-        a.reproduce += 0.005;
-        a.age -= Math.random() * 0.001;
-      }
+    if (d <= a.size * 1.5 && a.nutrient > 0.5) {
+      a.reproduce += 0.005;
+      a.age -= Math.random() * 0.001;
     }
+  }
 
-    if (a.reproduce >= 50 && a.nutrient >= 0.5) {
-      a.reproduce = 0;
-      a.size *= 0.8;
-      a.nutrient *= 0.8;
-      a.age += Math.random() * 0.01;
-      const born = {
-        ...a,
-        age: 0,
-        reproduce: 0,
-        nutrient: 0.9,
-        vx: a.vx * 0.3,
-        vy: a.vy * 0.3,
-        id: a.id + 0.001 + Math.random() * 0.001,
-        energy: Math.random() * 0.5 + 0.5,
-        size: START_PARTICLE_SIZE * 0.5,
-      };
-      newParticles.push(born);
-    }
+  if (a.reproduce >= 80 && a.nutrient >= 0.5) {
+    a.reproduce = 0;
+    a.size *= 0.8;
+    a.nutrient *= 0.5;
+    a.energy *= 0.5;
+    a.age += Math.random() * 0.2;
+    a.children += 1;
+    const born = {
+      ...a,
+      age: 0,
+      energy: 0.8,
+      children: 0,
+      reproduce: 0,
+      nutrient: 0.3,
+      vx: a.vx * 0.3,
+      vy: a.vy * 0.3,
+      size: START_PARTICLE_SIZE * 0.5,
+      id: a.id + 0.001 + Math.random() * 0.001,
+    };
+    newParticles.push(born);
   }
 
   return newParticles;
 };
 
-const eats = (p1: Particle[], p2: Particle[]) => {
-  for (let i = 0; i < p1.length; i++) {
-    const a = p1[i];
+const eats = (a: Particle, p2: Particle[]) => {
+  if (!a.alive) {
+    return;
+  }
 
-    if (!a.alive) {
+  let hasEaten = false;
+
+  for (let j = 0; j < p2.length; j++) {
+    const b = p2[j];
+    if (a.id === b.id || a.color === b.color || !b.alive || b.nutrient <= 0.3) {
       continue;
     }
 
-    for (let j = 0; j < p2.length; j++) {
-      const b = p2[j];
-      if (a.id === b.id || !b.alive) {
-        continue;
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+
+    if (d <= a.size) {
+      hasEaten = true;
+      a.nutrient += 0.01;
+      b.nutrient -= 0.001;
+      a.vx *= 1.01;
+      b.vx *= 0.95;
+      if (a.size <= 20) {
+        a.size *= 1.01;
       }
-
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const d = Math.sqrt(dx * dx + dy * dy);
-
-      if (d <= a.size * 2) {
-        a.nutrient += 0.01;
-        a.vx *= 1.01;
-        if (a.size <= 20) {
-          a.size *= 1.01;
-        }
-      } else if (d > a.size * 2) {
-        a.nutrient -= 0.0001;
-        a.vx *= 0.99;
-        if (a.size >= START_PARTICLE_SIZE) {
-          a.size *= 0.99;
-        }
+    } else if (d > a.size * 2) {
+      a.nutrient -= 0.0001;
+      b.nutrient += 0.0001;
+      a.vx *= 0.99;
+      if (a.size >= START_PARTICLE_SIZE) {
+        a.size *= 0.99;
       }
     }
+  }
 
-    if (a.nutrient <= 0.3) {
-      a.vx *= 0.5;
-      a.vy *= 0.5;
-    }
+  if (!hasEaten) {
+    a.nutrient -= 0.05;
+    a.energy -= 0.05;
+    a.reproduce -= 0.05;
+    a.vx *= 0.7;
+  }
 
-    if (a.nutrient <= 0) {
-      a.alive = false;
-    }
+  if (a.nutrient <= 0.3) {
+    a.vx *= 0.5;
+    a.vy *= 0.5;
+  }
+
+  if (a.nutrient <= 0) {
+    a.alive = false;
   }
 };
 
-const age = (p1: Particle[]) => {
-  for (let i = 0; i < p1.length; i++) {
-    const a = p1[i];
-    if (!a.alive) {
-      continue;
-    }
+const age = (a: Particle) => {
+  if (!a.alive) {
+    return;
+  }
 
-    a.age += Math.random() * 0.005;
-    if (a.age >= 1) {
-      a.alive = false;
-    }
+  a.age += Math.random() * 0.005;
+  if (a.age >= 1) {
+    a.alive = false;
+  }
+  if (a.age >= 0.9) {
+    a.color = 'gray';
   }
 };
 
@@ -269,27 +288,17 @@ const run = async () => {
   const allParticles = [...white, ...red, ...green];
 
   update(ctx, allParticles, (particles: Particle[]) => {
-    const newRed: Particle[] = particles.filter((p) => p.color === 'red');
-    const newWhite: Particle[] = particles.filter((p) => p.color === 'white');
-    const newGreen: Particle[] = particles.filter((p) => p.color === 'green');
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      eats(p, particles);
+      if (particles.length < 1000) {
+        particles.push(...reproduce(p, particles));
+      }
+      avoids(p, particles);
+      age(p);
+    }
 
-    eats(red, white);
-    eats(white, green);
-    eats(green, red);
-
-    newRed.push(...reproduce(red, red));
-    newWhite.push(...reproduce(white, white));
-    newGreen.push(...reproduce(green, green));
-
-    avoids(newWhite, newRed);
-    avoids(newGreen, newWhite);
-    avoids(newRed, newGreen);
-
-    age(newRed);
-    age(newWhite);
-    age(newGreen);
-
-    return [...newRed, ...newWhite, ...newGreen];
+    return particles;
   });
 };
 
