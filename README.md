@@ -17,6 +17,12 @@ Eating and reproducing by proximity.
 
 ![sample 3](samples/v.0.0.2-sustainable-colonies.gif)
 
+### Version 0.0.3
+
+Clusters
+
+![sample 4](samples/v.0.0.3-clusters.gif)
+
 ## Inspiration
 
 Code based or inspired by:
