@@ -2,8 +2,6 @@ const CANVAS_SIZE = 800;
 const START_PARTICLE_SIZE = 10;
 const RES = 0.6;
 
-type Type = 'eat' | 'avoid' | 'reproduce';
-
 interface Particle {
   id: number;
   x: number;
@@ -67,9 +65,7 @@ const createGroup = (ctx: CanvasRenderingContext2D, startPoint: number, n: numbe
   return group;
 };
 
-const rule = (p1: Particle[], p2: Particle[], type: Type): Particle[] => {
-  const newParticles: Particle[] = [];
-
+const avoids = (p1: Particle[], p2: Particle[]) => {
   for (let i = 0; i < p1.length; i++) {
     const a = p1[i];
 
@@ -82,41 +78,20 @@ const rule = (p1: Particle[], p2: Particle[], type: Type): Particle[] => {
 
     for (let j = 0; j < p2.length; j++) {
       const b = p2[j];
+
       if (a.id === b.id || !b.alive) {
         continue;
       }
 
       const dx = a.x - b.x;
       const dy = a.y - b.y;
-      const d = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (d > 0 && d < a.size * 10) {
-        const grav = type === 'eat' ? 1 : -1;
-        const F = grav * (1 / d);
+      if (distance > 0 && distance < a.size * 10) {
+        const grav = -1;
+        const F = grav * (1 / distance);
         fx += F * dx;
         fy += F * dy;
-      }
-
-      if (type === 'reproduce') {
-        if (d <= a.size * 1.5 && a.nutrient > 0.5) {
-          a.reproduce += 0.01;
-        }
-      }
-
-      if (type === 'eat') {
-        if (d <= a.size * 2) {
-          a.nutrient += 0.01;
-          a.vx *= 1.01;
-          if (a.size <= 20) {
-            a.size *= 1.01;
-          }
-        } else if (d > a.size * 3) {
-          a.nutrient -= 0.0001;
-          a.vx *= 0.99;
-          if (a.size >= START_PARTICLE_SIZE) {
-            a.size *= 0.99;
-          }
-        }
       }
     }
 
@@ -132,33 +107,13 @@ const rule = (p1: Particle[], p2: Particle[], type: Type): Particle[] => {
     a.y += a.vy;
 
     if (a.x <= 0 || a.x >= CANVAS_SIZE - a.size) {
-      a.vx *= -a.size;
+      a.vx *= -1;
     }
 
     if (a.y <= 0 || a.y >= CANVAS_SIZE - a.size) {
-      a.vy *= -a.size;
-    }
-
-    if (a.reproduce >= 50 && a.nutrient >= 0.5) {
-      a.reproduce = 0;
-      a.size *= 0.8;
-      a.nutrient *= 0.8;
-      newParticles.push({
-        ...a,
-        vx: a.vx * 0.5,
-        vy: a.vy * 0.5,
-        nutrient: 1,
-        reproduce: 0,
-        size: START_PARTICLE_SIZE,
-      });
-    }
-
-    if (a.nutrient <= 0) {
-      a.alive = false;
+      a.vy *= -1;
     }
   }
-
-  return newParticles;
 };
 
 const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: () => Particle[]) => {
@@ -174,26 +129,22 @@ const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: () 
 };
 
 const run = async () => {
+  console.log('start');
+
   const ctx = getContext2D();
 
-  const red = createGroup(ctx, 0, 300, CANVAS_SIZE - 50, 'red');
+  const red = createGroup(ctx, 0, 50, CANVAS_SIZE - 50, 'red');
   const white = createGroup(ctx, red.length, 300, CANVAS_SIZE - 50, 'white');
-  const green = createGroup(ctx, white.length, 300, CANVAS_SIZE - 50, 'green');
+  const green = createGroup(ctx, white.length, 50, CANVAS_SIZE - 50, 'green');
   const allParticles = [...white, ...red, ...green];
 
   update(ctx, allParticles, () => {
     const newParticles: Particle[] = [];
-    newParticles.push(...rule(red, white, 'eat'));
-    newParticles.push(...rule(green, red, 'eat'));
-    newParticles.push(...rule(white, green, 'eat'));
 
-    newParticles.push(...rule(red, white, 'avoid'));
-    newParticles.push(...rule(green, red, 'avoid'));
-    newParticles.push(...rule(white, green, 'avoid'));
+    avoids(white, red);
+    avoids(green, white);
+    avoids(red, green);
 
-    newParticles.push(...rule(red, red, 'reproduce'));
-    newParticles.push(...rule(white, white, 'reproduce'));
-    newParticles.push(...rule(green, green, 'reproduce'));
     return newParticles;
   });
 };
