@@ -1,3 +1,5 @@
+let paused = false;
+let allParticles: Particle[] = [];
 const CANVAS_SIZE = 800;
 const START_PARTICLE_SIZE = 10;
 
@@ -74,7 +76,7 @@ const createGroup = (ctx: CanvasRenderingContext2D, startPoint: number, n: numbe
   return group;
 };
 
-const avoids = (a: Particle, p2: Particle[]) => {
+const move = (a: Particle, p2: Particle[]) => {
   if (!a.alive) {
     return;
   }
@@ -92,6 +94,7 @@ const avoids = (a: Particle, p2: Particle[]) => {
 
     foundCandidates = true;
 
+    a.nutrient -= 0.0001;
     a.x += randomWalk();
     a.y += randomWalk();
 
@@ -149,13 +152,14 @@ const avoids = (a: Particle, p2: Particle[]) => {
 const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
   const newParticles: Particle[] = [];
 
-  if (!a.alive || a.children > 3) {
+  if (!a.alive || a.children >= 3 || a.nutrient < 0.8 || a.age > 0.75 || p2.length >= 1000) {
     return newParticles;
   }
 
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
-    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient <= 0.5) {
+
+    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient <= 0.35) {
       continue;
     }
 
@@ -163,19 +167,19 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
     const dy = a.y - b.y;
     const d = Math.sqrt(dx * dx + dy * dy);
 
-    if (d <= a.size * 1.5 && a.nutrient > 0.5) {
-      a.reproduce += 0.005;
-      a.age -= Math.random() * 0.001;
+    if (d <= a.size) {
+      a.reproduce += 0.01;
     }
   }
 
-  if (a.reproduce >= 80 && a.nutrient >= 0.5) {
+  if (a.reproduce >= 0.9 && a.nutrient >= 0.75 && a.energy >= 0.75) {
     a.reproduce = 0;
     a.size *= 0.8;
     a.nutrient *= 0.5;
     a.energy *= 0.5;
-    a.age += Math.random() * 0.2;
     a.children += 1;
+    a.age -= Math.random() * 0.001;
+
     const born = {
       ...a,
       age: 0,
@@ -188,14 +192,19 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
       size: START_PARTICLE_SIZE * 0.5,
       id: a.id + 0.001 + Math.random() * 0.001,
     };
+
     newParticles.push(born);
+  }
+
+  if (a.reproduce >= 1) {
+    a.reproduce = 1;
   }
 
   return newParticles;
 };
 
 const eats = (a: Particle, p2: Particle[]) => {
-  if (!a.alive) {
+  if (!a.alive || a.nutrient >= 0.8) {
     return;
   }
 
@@ -203,7 +212,7 @@ const eats = (a: Particle, p2: Particle[]) => {
 
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
-    if (a.id === b.id || a.color === b.color || !b.alive || b.nutrient <= 0.3) {
+    if (a.id === b.id || a.color === b.color || !b.alive || b.nutrient <= 0.25) {
       continue;
     }
 
@@ -213,28 +222,21 @@ const eats = (a: Particle, p2: Particle[]) => {
 
     if (d <= a.size) {
       hasEaten = true;
-      a.nutrient += 0.01;
-      b.nutrient -= 0.001;
+      a.nutrient += 0.05;
+      b.nutrient -= 0.01;
+      a.reproduce += 0.0005;
       a.vx *= 1.01;
       b.vx *= 0.95;
       if (a.size <= 20) {
         a.size *= 1.01;
       }
-    } else if (d > a.size * 2) {
-      a.nutrient -= 0.0001;
-      b.nutrient += 0.0001;
-      a.vx *= 0.99;
-      if (a.size >= START_PARTICLE_SIZE) {
-        a.size *= 0.99;
-      }
     }
   }
 
   if (!hasEaten) {
-    a.nutrient -= 0.05;
-    a.energy -= 0.05;
-    a.reproduce -= 0.05;
-    a.vx *= 0.7;
+    a.nutrient -= 0.005;
+    a.energy -= 0.005;
+    a.vx *= 0.95;
   }
 
   if (a.nutrient <= 0.3) {
@@ -252,10 +254,17 @@ const age = (a: Particle) => {
     return;
   }
 
-  a.age += Math.random() * 0.005;
+  if (a.age <= 0) {
+    a.age = 0;
+  }
+
+  a.age += Math.random() * 0.001;
+  a.reproduce += Math.random() * 0.0001;
+
   if (a.age >= 1) {
     a.alive = false;
   }
+
   if (a.age >= 0.9) {
     a.color = 'gray';
   }
@@ -266,9 +275,7 @@ const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: (pa
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   draw(ctx, 0, 0, CANVAS_SIZE, 'black');
   newParticles.forEach((p) => {
-    if (p.alive) {
-      draw(ctx, p.x, p.y, p.size, p.color);
-    }
+    draw(ctx, p.x, p.y, p.size, p.color);
   });
   const countElement = document.getElementById('count');
   if (countElement) {
@@ -283,23 +290,27 @@ const run = async () => {
   const ctx = getContext2D();
 
   const red = createGroup(ctx, 0, 100, CANVAS_SIZE - 50, 'red');
-  const white = createGroup(ctx, red.length, 200, CANVAS_SIZE - 50, 'white');
+  const white = createGroup(ctx, red.length, 100, CANVAS_SIZE - 50, 'white');
   const green = createGroup(ctx, white.length, 100, CANVAS_SIZE - 50, 'green');
-  const allParticles = [...white, ...red, ...green];
+  allParticles = [...white, ...red, ...green];
 
   update(ctx, allParticles, (particles: Particle[]) => {
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i];
-      eats(p, particles);
-      if (particles.length < 1000) {
+    if (!paused) {
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        eats(p, particles);
         particles.push(...reproduce(p, particles));
+        move(p, particles);
+        age(p);
       }
-      avoids(p, particles);
-      age(p);
     }
-
     return particles;
   });
 };
+
+document.getElementById('pause')?.addEventListener('click', () => {
+  paused = !paused;
+  console.log(allParticles);
+});
 
 run().then(() => console.log('done'));

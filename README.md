@@ -8,9 +8,9 @@ See live versions at [artificial](https://pablorosales.github.io/artificial/).
 
 See [here](./samples) for GIFs on different versions.
 
-Version 0.0.4 Rockets.
+Version 0.0.7 Koi Pond
 
-![sample](./samples/v.0.0.4-rockets.gif)
+![sample](./samples/v.0.0.7-koi.gif)
 
 ## Inspiration
 
