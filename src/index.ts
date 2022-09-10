@@ -7,6 +7,7 @@ interface Particle {
   y: number;
   vx: number;
   vy: number;
+  age: number;
   size: number;
   color: string;
   alive: boolean;
@@ -59,6 +60,7 @@ const createGroup = (ctx: CanvasRenderingContext2D, startPoint: number, n: numbe
         x: random(area),
         y: random(area),
         color,
+        age: 0,
         energy: 0.02,
         alive: true,
         nutrient: 1,
@@ -155,6 +157,7 @@ const reproduce = (p1: Particle[], p2: Particle[]): Particle[] => {
 
       if (d <= a.size * 1.5 && a.nutrient > 0.5) {
         a.reproduce += 0.005;
+        a.age -= Math.random() * 0.001;
       }
     }
 
@@ -162,15 +165,19 @@ const reproduce = (p1: Particle[], p2: Particle[]): Particle[] => {
       a.reproduce = 0;
       a.size *= 0.8;
       a.nutrient *= 0.8;
-      newParticles.push({
+      a.age += Math.random() * 0.01;
+      const born = {
         ...a,
+        age: 0,
+        reproduce: 0,
+        nutrient: 0.9,
         vx: a.vx * 0.3,
         vy: a.vy * 0.3,
-        nutrient: 1,
-        reproduce: 0,
-        energy: Math.random() * 0.5 + 0.8,
+        id: a.id + 0.001 + Math.random() * 0.001,
+        energy: Math.random() * 0.5 + 0.5,
         size: START_PARTICLE_SIZE * 0.5,
-      });
+      };
+      newParticles.push(born);
     }
   }
 
@@ -221,8 +228,22 @@ const eats = (p1: Particle[], p2: Particle[]) => {
   }
 };
 
+const age = (p1: Particle[]) => {
+  for (let i = 0; i < p1.length; i++) {
+    const a = p1[i];
+    if (!a.alive) {
+      continue;
+    }
+
+    a.age += Math.random() * 0.005;
+    if (a.age >= 1) {
+      a.alive = false;
+    }
+  }
+};
+
 const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: (particles: Particle[]) => Particle[]) => {
-  const newParticles = rules(particles);
+  const newParticles = rules(particles).filter((p) => p.alive);
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   draw(ctx, 0, 0, CANVAS_SIZE, 'black');
   newParticles.forEach((p) => {
@@ -230,6 +251,10 @@ const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: (pa
       draw(ctx, p.x, p.y, p.size, p.color);
     }
   });
+  const countElement = document.getElementById('count');
+  if (countElement) {
+    countElement.innerText = `${newParticles.length} particles`;
+  }
   requestAnimationFrame(() => update(ctx, newParticles, rules));
 };
 
@@ -259,6 +284,10 @@ const run = async () => {
     avoids(newWhite, newRed);
     avoids(newGreen, newWhite);
     avoids(newRed, newGreen);
+
+    age(newRed);
+    age(newWhite);
+    age(newGreen);
 
     return [...newRed, ...newWhite, ...newGreen];
   });
