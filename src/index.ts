@@ -88,7 +88,7 @@ const move = (a: Particle, p2: Particle[]) => {
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
 
-    if (a.id === b.id || !b.alive || a.color === b.color || b.nutrient <= 0.3) {
+    if (a.id === b.id || !b.alive || a.color === b.color || b.nutrient <= 0.75) {
       continue;
     }
 
@@ -156,10 +156,12 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
     return newParticles;
   }
 
+  let foundCandidates = false;
+
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
 
-    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient <= 0.35) {
+    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient < 0.75 || b.reproduce < 0.5) {
       continue;
     }
 
@@ -168,11 +170,12 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
     const d = Math.sqrt(dx * dx + dy * dy);
 
     if (d <= a.size) {
+      foundCandidates = true;
       a.reproduce += 0.01;
     }
   }
 
-  if (a.reproduce >= 0.9 && a.nutrient >= 0.75 && a.energy >= 0.75) {
+  if (foundCandidates && a.reproduce >= 0.9 && a.nutrient >= 0.75 && a.energy >= 0.75) {
     a.reproduce = 0;
     a.size *= 0.8;
     a.nutrient *= 0.5;
@@ -227,7 +230,7 @@ const eats = (a: Particle, p2: Particle[]) => {
       a.reproduce += 0.0005;
       a.vx *= 1.01;
       b.vx *= 0.95;
-      if (a.size <= 20) {
+      if (a.size <= START_PARTICLE_SIZE) {
         a.size *= 1.01;
       }
     }
@@ -236,6 +239,7 @@ const eats = (a: Particle, p2: Particle[]) => {
   if (!hasEaten) {
     a.nutrient -= 0.005;
     a.energy -= 0.005;
+    a.size *= 0.99;
     a.vx *= 0.95;
   }
 
@@ -290,7 +294,7 @@ const run = async () => {
   const ctx = getContext2D();
 
   const red = createGroup(ctx, 0, 100, CANVAS_SIZE - 50, 'red');
-  const white = createGroup(ctx, red.length, 100, CANVAS_SIZE - 50, 'white');
+  const white = createGroup(ctx, red.length, 200, CANVAS_SIZE - 50, 'white');
   const green = createGroup(ctx, white.length, 100, CANVAS_SIZE - 50, 'green');
   allParticles = [...white, ...red, ...green];
 
@@ -298,10 +302,18 @@ const run = async () => {
     if (!paused) {
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
+        if (p.size < START_PARTICLE_SIZE / 2) {
+          p.size = START_PARTICLE_SIZE / 2;
+        }
         eats(p, particles);
         particles.push(...reproduce(p, particles));
         move(p, particles);
         age(p);
+      }
+      if (particles.length < 300) {
+        particles.push(...createGroup(ctx, 0, 3, CANVAS_SIZE - 50, 'white'));
+        particles.push(...createGroup(ctx, 0, 3, CANVAS_SIZE - 50, 'red'));
+        particles.push(...createGroup(ctx, 0, 3, CANVAS_SIZE - 50, 'green'));
       }
     }
     return particles;
