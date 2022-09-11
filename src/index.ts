@@ -1,3 +1,4 @@
+let speed = 0;
 let paused = false;
 let allParticles: Particle[] = [];
 const CANVAS_SIZE = 800;
@@ -274,8 +275,12 @@ const age = (a: Particle) => {
   }
 };
 
-const update = (ctx: CanvasRenderingContext2D, particles: Particle[], rules: (particles: Particle[]) => Particle[]) => {
-  const newParticles = rules(particles).filter((p) => p.alive);
+const update = async (
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  rules: (particles: Particle[]) => Promise<Particle[]>,
+) => {
+  const newParticles = (await rules(particles)).filter((p) => p.alive);
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   draw(ctx, 0, 0, CANVAS_SIZE, 'black');
   newParticles.forEach((p) => {
@@ -293,12 +298,12 @@ const run = async () => {
 
   const ctx = getContext2D();
 
-  const red = createGroup(ctx, 0, 100, CANVAS_SIZE - 50, 'red');
+  const red = createGroup(ctx, 0, 200, CANVAS_SIZE - 50, 'red');
   const white = createGroup(ctx, red.length, 200, CANVAS_SIZE - 50, 'white');
   const green = createGroup(ctx, white.length, 100, CANVAS_SIZE - 50, 'green');
   allParticles = [...white, ...red, ...green];
 
-  update(ctx, allParticles, (particles: Particle[]) => {
+  await update(ctx, allParticles, async (particles: Particle[]) => {
     if (!paused) {
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
@@ -311,9 +316,13 @@ const run = async () => {
         age(p);
       }
       if (particles.length < 300) {
-        particles.push(...createGroup(ctx, 0, 3, CANVAS_SIZE - 50, 'white'));
-        particles.push(...createGroup(ctx, 0, 3, CANVAS_SIZE - 50, 'red'));
-        particles.push(...createGroup(ctx, 0, 3, CANVAS_SIZE - 50, 'green'));
+        // 5 new of each is enough to keep the simulation running in a good state
+        particles.push(...createGroup(ctx, 0, 5, CANVAS_SIZE - 50, 'white'));
+        particles.push(...createGroup(ctx, 0, 5, CANVAS_SIZE - 50, 'red'));
+        particles.push(...createGroup(ctx, 0, 5, CANVAS_SIZE - 50, 'green'));
+      }
+      if (speed > 0) {
+        await new Promise((resolve) => setTimeout(resolve, speed));
       }
     }
     return particles;
@@ -323,6 +332,13 @@ const run = async () => {
 document.getElementById('pause')?.addEventListener('click', () => {
   paused = !paused;
   console.log(allParticles);
+});
+
+document.getElementById('speed')?.addEventListener('change', (e) => {
+  const value = (e.target as HTMLInputElement).value;
+  if (value) {
+    speed = parseInt(value, 10);
+  }
 });
 
 run().then(() => console.log('done'));
