@@ -6,6 +6,10 @@ body, html {
     @apply bg-gray-900;
 }
 
-body {
-    @apply h-screen flex items-center justify-center;
+.danger {
+  @apply bg-red-800;
+}
+
+.success {
+  @apply bg-green-800;
 }

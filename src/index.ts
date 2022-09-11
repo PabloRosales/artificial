@@ -1,8 +1,9 @@
 let speed = 0;
 let paused = false;
+let addRandomParticles = true;
 let allParticles: Particle[] = [];
 const CANVAS_SIZE = 800;
-const START_PARTICLE_SIZE = 10;
+const START_PARTICLE_SIZE = 5;
 
 interface Particle {
   id: number;
@@ -55,17 +56,17 @@ const random = (area: number) => {
   return Math.random() * area;
 };
 
-const createGroup = (ctx: CanvasRenderingContext2D, startPoint: number, n: number, area: number, color: string) => {
+const createGroup = (ctx: CanvasRenderingContext2D, n: number, area: number, color: string) => {
   const group = [];
   for (let i = 0; i < n; i++) {
     group.push(
       createParticle(ctx, {
-        id: i + startPoint,
+        id: Date.now() + i,
         x: random(area),
         y: random(area),
         color,
         age: 0,
-        energy: 0.02,
+        energy: 1,
         alive: true,
         nutrient: 1,
         reproduce: 0,
@@ -96,17 +97,19 @@ const move = (a: Particle, p2: Particle[]) => {
     foundCandidates = true;
 
     a.nutrient -= 0.0001;
-    a.x += randomWalk();
-    a.y += randomWalk();
+    if (a.color === 'white') {
+      a.x += randomWalk();
+      a.y += randomWalk();
+    }
 
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    if (distance > a.size * 10) {
-      a.energy += 0.02;
-    } else if (distance < a.size * 2) {
-      a.energy -= 0.05;
+    if (distance > a.size * 2) {
+      a.energy += 0.05;
+    } else if (distance < a.size) {
+      a.energy -= 0.02;
     }
 
     if (a.energy < 0) {
@@ -123,14 +126,9 @@ const move = (a: Particle, p2: Particle[]) => {
     }
   }
 
-  let speed = 0.5;
-  if (a.nutrient > 0.8) {
-    speed = 0.8;
-  }
-
   if (foundCandidates) {
-    a.vx = (a.vx + fx) * speed;
-    a.vy = (a.vy + fy) * speed;
+    a.vx = (a.vx + fx) * 0.5;
+    a.vy = (a.vy + fy) * 0.5;
 
     if (a.nutrient <= 0.3) {
       a.vx *= 0.8;
@@ -153,7 +151,7 @@ const move = (a: Particle, p2: Particle[]) => {
 const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
   const newParticles: Particle[] = [];
 
-  if (!a.alive || a.children >= 3 || a.nutrient < 0.8 || a.age > 0.75 || p2.length >= 1000) {
+  if (!a.alive || a.children >= 2 || a.nutrient < 0.75 || p2.length >= 1000) {
     return newParticles;
   }
 
@@ -162,7 +160,7 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
 
-    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient < 0.75 || b.reproduce < 0.5) {
+    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient < 0.75 || b.reproduce < 0.3) {
       continue;
     }
 
@@ -172,25 +170,25 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
 
     if (d <= a.size) {
       foundCandidates = true;
-      a.reproduce += 0.01;
+      a.reproduce += 0.02;
     }
   }
 
   if (foundCandidates && a.reproduce >= 0.9 && a.nutrient >= 0.75 && a.energy >= 0.75) {
     a.reproduce = 0;
     a.size *= 0.8;
-    a.nutrient *= 0.5;
-    a.energy *= 0.5;
+    a.nutrient *= 0.8;
+    a.energy *= 0.8;
     a.children += 1;
     a.age -= Math.random() * 0.001;
 
     const born = {
       ...a,
       age: 0,
-      energy: 0.8,
       children: 0,
-      reproduce: 0,
-      nutrient: 0.3,
+      energy: Math.random() * 0.2,
+      nutrient: Math.random() * 0.5,
+      reproduce: Math.random() * 0.5,
       vx: a.vx * 0.3,
       vy: a.vy * 0.3,
       size: START_PARTICLE_SIZE * 0.5,
@@ -208,7 +206,7 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
 };
 
 const eats = (a: Particle, p2: Particle[]) => {
-  if (!a.alive || a.nutrient >= 0.8) {
+  if (!a.alive || a.nutrient >= 0.9) {
     return;
   }
 
@@ -226,9 +224,14 @@ const eats = (a: Particle, p2: Particle[]) => {
 
     if (d <= a.size) {
       hasEaten = true;
-      a.nutrient += 0.05;
-      b.nutrient -= 0.01;
-      a.reproduce += 0.0005;
+      if (b.color === 'purple') {
+        a.nutrient += 0.03;
+        b.nutrient -= 0.3;
+      } else {
+        a.nutrient += 0.05;
+        b.nutrient -= 0.001;
+      }
+      a.reproduce += 0.01;
       a.vx *= 1.01;
       b.vx *= 0.95;
       if (a.size <= START_PARTICLE_SIZE) {
@@ -238,8 +241,8 @@ const eats = (a: Particle, p2: Particle[]) => {
   }
 
   if (!hasEaten) {
-    a.nutrient -= 0.005;
-    a.energy -= 0.005;
+    a.nutrient -= 0.0001;
+    a.energy -= 0.0001;
     a.size *= 0.99;
     a.vx *= 0.95;
   }
@@ -247,10 +250,6 @@ const eats = (a: Particle, p2: Particle[]) => {
   if (a.nutrient <= 0.3) {
     a.vx *= 0.5;
     a.vy *= 0.5;
-  }
-
-  if (a.nutrient <= 0) {
-    a.alive = false;
   }
 };
 
@@ -263,7 +262,7 @@ const age = (a: Particle) => {
     a.age = 0;
   }
 
-  a.age += Math.random() * 0.001;
+  a.age += Math.random() * 0.01;
   a.reproduce += Math.random() * 0.0001;
 
   if (a.age >= 1) {
@@ -275,22 +274,18 @@ const age = (a: Particle) => {
   }
 };
 
-const update = async (
-  ctx: CanvasRenderingContext2D,
-  particles: Particle[],
-  rules: (particles: Particle[]) => Promise<Particle[]>,
-) => {
-  const newParticles = (await rules(particles)).filter((p) => p.alive);
+const update = async (ctx: CanvasRenderingContext2D, rules: (particles: Particle[]) => Promise<Particle[]>) => {
+  allParticles = (await rules(allParticles)).filter((p) => p.alive);
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   draw(ctx, 0, 0, CANVAS_SIZE, 'black');
-  newParticles.forEach((p) => {
+  allParticles.forEach((p) => {
     draw(ctx, p.x, p.y, p.size, p.color);
   });
   const countElement = document.getElementById('count');
   if (countElement) {
-    countElement.innerText = `${newParticles.length} particles`;
+    countElement.innerText = `${allParticles.length} particles`;
   }
-  requestAnimationFrame(() => update(ctx, newParticles, rules));
+  requestAnimationFrame(() => update(ctx, rules));
 };
 
 const run = async () => {
@@ -298,28 +293,39 @@ const run = async () => {
 
   const ctx = getContext2D();
 
-  const red = createGroup(ctx, 0, 200, CANVAS_SIZE - 50, 'red');
-  const white = createGroup(ctx, red.length, 200, CANVAS_SIZE - 50, 'white');
-  const green = createGroup(ctx, white.length, 100, CANVAS_SIZE - 50, 'green');
-  allParticles = [...white, ...red, ...green];
+  const red = createGroup(ctx, 50, CANVAS_SIZE - 50, 'red');
+  const white = createGroup(ctx, 200, CANVAS_SIZE - 50, 'white');
+  const green = createGroup(ctx, 100, CANVAS_SIZE - 50, 'green');
+  const yellow = createGroup(ctx, 50, CANVAS_SIZE - 50, 'yellow');
+  const purple = createGroup(ctx, 50, CANVAS_SIZE - 50, 'purple');
+  allParticles = [...white, ...red, ...green, ...yellow, ...purple];
 
-  await update(ctx, allParticles, async (particles: Particle[]) => {
+  await update(ctx, async (particles: Particle[]) => {
     if (!paused) {
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
-        if (p.size < START_PARTICLE_SIZE / 2) {
-          p.size = START_PARTICLE_SIZE / 2;
+
+        if (p.size < START_PARTICLE_SIZE) {
+          p.size = START_PARTICLE_SIZE;
         }
-        eats(p, particles);
-        particles.push(...reproduce(p, particles));
-        move(p, particles);
-        age(p);
+
+        if (p.color !== 'purple') {
+          eats(p, particles);
+          particles.push(...reproduce(p, particles));
+          move(p, particles);
+          age(p);
+        }
+
+        if (p.nutrient <= 0) {
+          p.alive = false;
+        }
       }
-      if (particles.length < 300) {
-        // 5 new of each is enough to keep the simulation running in a good state
-        particles.push(...createGroup(ctx, 0, 5, CANVAS_SIZE - 50, 'white'));
-        particles.push(...createGroup(ctx, 0, 5, CANVAS_SIZE - 50, 'red'));
-        particles.push(...createGroup(ctx, 0, 5, CANVAS_SIZE - 50, 'green'));
+      if (addRandomParticles && particles.length < 200) {
+        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'red'));
+        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'white'));
+        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'green'));
+        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'yellow'));
+        particles.push(...createGroup(ctx, 20, CANVAS_SIZE - 50, 'purple'));
       }
       if (speed > 0) {
         await new Promise((resolve) => setTimeout(resolve, speed));
@@ -330,8 +336,30 @@ const run = async () => {
 };
 
 document.getElementById('pause')?.addEventListener('click', () => {
+  const el = document.getElementById('pause');
+  if (el) {
+    el.textContent = paused ? 'pause' : 'resume';
+  }
   paused = !paused;
   console.log(allParticles);
+});
+
+document.getElementById('add')?.addEventListener('click', () => {
+  const el = document.getElementById('add');
+  if (el) {
+    const span = el.querySelector('span');
+    if (span) {
+      span.textContent = addRandomParticles ? 'no random particles' : 'random particles';
+    }
+    el.classList.toggle('danger');
+    el.classList.toggle('success');
+  }
+  const elIcon = document.getElementById('add-icon');
+  if (elIcon) {
+    elIcon.classList.toggle('fa-check');
+    elIcon.classList.toggle('fa-times');
+  }
+  addRandomParticles = !addRandomParticles;
 });
 
 document.getElementById('speed')?.addEventListener('change', (e) => {
