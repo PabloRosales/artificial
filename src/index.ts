@@ -5,10 +5,17 @@ let allParticles: Particle[] = [];
 const CANVAS_SIZE = 800;
 const START_PARTICLE_SIZE = 5;
 
-interface Particle {
-  id: number;
+interface ParticleBase {
   x: number;
   y: number;
+  size: number;
+  color: string;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  id: number;
   vx: number;
   vy: number;
   age: number;
@@ -16,9 +23,11 @@ interface Particle {
   color: string;
   alive: boolean;
   energy: number;
+  angle: number;
   nutrient: number;
   reproduce: number;
   children: number;
+  particles: ParticleBase[];
 }
 
 const getContext2D = (): CanvasRenderingContext2D => {
@@ -52,18 +61,30 @@ const randomWalk = () => {
   return Math.random() * 0.5 - 0.25;
 };
 
-const random = (area: number) => {
+const distance = (a: Particle, b: Particle) => {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+const randomArea = (area: number) => {
   return Math.random() * area;
 };
 
-const createGroup = (ctx: CanvasRenderingContext2D, n: number, area: number, color: string) => {
+const createGroup = (
+  ctx: CanvasRenderingContext2D,
+  n: number,
+  area: number,
+  color: string,
+  structure: ParticleBase[],
+) => {
   const group = [];
   for (let i = 0; i < n; i++) {
     group.push(
       createParticle(ctx, {
         id: Date.now() + i,
-        x: random(area),
-        y: random(area),
+        x: randomArea(area),
+        y: randomArea(area),
         color,
         age: 0,
         energy: 1,
@@ -71,7 +92,9 @@ const createGroup = (ctx: CanvasRenderingContext2D, n: number, area: number, col
         nutrient: 1,
         reproduce: 0,
         children: 0,
-        size: color === 'purple' ? START_PARTICLE_SIZE * 4 : START_PARTICLE_SIZE,
+        size: START_PARTICLE_SIZE,
+        angle: 0,
+        particles: structure,
       }),
     );
   }
@@ -85,6 +108,7 @@ const move = (a: Particle, p2: Particle[]) => {
 
   let fx = 0;
   let fy = 0;
+  let angle = 0;
   let foundCandidates = false;
 
   for (let j = 0; j < p2.length; j++) {
@@ -105,8 +129,9 @@ const move = (a: Particle, p2: Particle[]) => {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
+    angle = a.angle + Math.atan2(dy, dx);
 
-    if (distance > a.size * 2) {
+    if (distance > a.size) {
       a.energy += 0.05;
     } else if (distance < a.size) {
       a.energy -= 0.02;
@@ -135,6 +160,8 @@ const move = (a: Particle, p2: Particle[]) => {
       a.vy *= 0.8;
     }
 
+    a.angle = angle;
+
     a.x += a.vx;
     a.y += a.vy;
   }
@@ -151,7 +178,7 @@ const move = (a: Particle, p2: Particle[]) => {
 const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
   const newParticles: Particle[] = [];
 
-  if (!a.alive || a.children >= 2 || a.nutrient < 0.75 || p2.length >= 1000) {
+  if (!a.alive || a.children >= 2 || a.nutrient < 0.75 || p2.length >= 500) {
     return newParticles;
   }
 
@@ -218,19 +245,12 @@ const eats = (a: Particle, p2: Particle[]) => {
       continue;
     }
 
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    const d = Math.sqrt(dx * dx + dy * dy);
+    const d = distance(a, b);
 
     if (d <= a.size) {
       hasEaten = true;
-      if (b.color === 'purple') {
-        a.nutrient += 0.03;
-        b.nutrient -= 0.3;
-      } else {
-        a.nutrient += 0.05;
-        b.nutrient -= 0.001;
-      }
+      a.nutrient += 0.05;
+      b.nutrient -= 0.001;
       a.reproduce += 0.01;
       a.vx *= 1.01;
       b.vx *= 0.95;
@@ -280,6 +300,12 @@ const update = async (ctx: CanvasRenderingContext2D, rules: (particles: Particle
   draw(ctx, 0, 0, CANVAS_SIZE, 'black');
   allParticles.forEach((p) => {
     draw(ctx, p.x, p.y, p.size, p.color);
+    for (let i = 0; i < p.particles.length; i++) {
+      const c = p.particles[i];
+      const childX = p.x + Math.cos(p.angle * 0.5) * p.size;
+      const childY = p.y + Math.sin(p.angle * 0.5) * p.size;
+      draw(ctx, childX, childY, c.size, c.color);
+    }
   });
   const countElement = document.getElementById('count');
   if (countElement) {
@@ -293,8 +319,16 @@ const run = async () => {
 
   const ctx = getContext2D();
 
-  const red = createGroup(ctx, 200, CANVAS_SIZE - 50, 'red');
-  const white = createGroup(ctx, 200, CANVAS_SIZE - 50, 'white');
+  const redStructure = [
+    { x: START_PARTICLE_SIZE + START_PARTICLE_SIZE / 2, y: 0, color: 'white', size: START_PARTICLE_SIZE * 0.5 },
+  ];
+  const red = createGroup(ctx, 200, CANVAS_SIZE - 50, 'red', redStructure);
+
+  const whiteStructure = [
+    { x: START_PARTICLE_SIZE + START_PARTICLE_SIZE / 2, y: 0, color: 'yellow', size: START_PARTICLE_SIZE * 0.5 },
+  ];
+  const white = createGroup(ctx, 200, CANVAS_SIZE - 50, 'white', whiteStructure);
+
   allParticles = [...white, ...red];
 
   await update(ctx, async (particles: Particle[]) => {
@@ -306,12 +340,10 @@ const run = async () => {
           p.size = START_PARTICLE_SIZE;
         }
 
-        if (p.color !== 'purple') {
-          eats(p, particles);
-          particles.push(...reproduce(p, particles));
-          move(p, particles);
-          age(p);
-        }
+        eats(p, particles);
+        particles.push(...reproduce(p, particles));
+        move(p, particles);
+        age(p);
 
         if (p.nutrient <= 0) {
           p.alive = false;
@@ -329,9 +361,9 @@ const run = async () => {
           p.y = CANVAS_SIZE;
         }
       }
-      if (addRandomParticles && particles.length < 200) {
-        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'red'));
-        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'white'));
+      if (addRandomParticles && particles.length < 25) {
+        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'red', redStructure));
+        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'white', whiteStructure));
       }
       if (speed > 0) {
         await new Promise((resolve) => setTimeout(resolve, speed));
