@@ -89,7 +89,7 @@ const createGroup = (
         age: 0,
         energy: 1,
         alive: true,
-        nutrient: 1,
+        nutrient: 0.75,
         reproduce: 0,
         children: 0,
         size: START_PARTICLE_SIZE,
@@ -114,17 +114,15 @@ const move = (a: Particle, p2: Particle[]) => {
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
 
-    if (a.id === b.id || !b.alive || a.color === b.color || b.nutrient <= 0.75) {
+    if (a.id === b.id || !b.alive || b.nutrient <= 0.25) {
       continue;
     }
 
     foundCandidates = true;
 
     a.nutrient -= 0.0001;
-    if (a.color === 'red') {
-      a.x += randomWalk();
-      a.y += randomWalk();
-    }
+    a.x += randomWalk();
+    a.y += randomWalk();
 
     const dx = a.x - b.x;
     const dy = a.y - b.y;
@@ -152,8 +150,8 @@ const move = (a: Particle, p2: Particle[]) => {
   }
 
   if (foundCandidates) {
-    a.vx = (a.vx + fx) * 0.5;
-    a.vy = (a.vy + fy) * 0.5;
+    a.vx = (a.vx + fx) * 0.5 + Math.cos(angle) * 0.5;
+    a.vy = (a.vy + fy) * 0.5 + Math.sin(angle) * 0.5;
 
     if (a.nutrient <= 0.3) {
       a.vx *= 0.8;
@@ -187,7 +185,7 @@ const reproduce = (a: Particle, p2: Particle[]): Particle[] => {
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
 
-    if (a.id === b.id || a.color !== b.color || !b.alive || b.nutrient < 0.75 || b.reproduce < 0.3) {
+    if (a.id === b.id || !b.alive || b.nutrient < 0.5 || b.reproduce < 0.5) {
       continue;
     }
 
@@ -241,7 +239,7 @@ const eats = (a: Particle, p2: Particle[]) => {
 
   for (let j = 0; j < p2.length; j++) {
     const b = p2[j];
-    if (a.id === b.id || a.color === b.color || !b.alive || b.nutrient <= 0.25) {
+    if (a.id === b.id || !b.alive || b.nutrient <= 0.25) {
       continue;
     }
 
@@ -309,7 +307,9 @@ const update = async (ctx: CanvasRenderingContext2D, rules: (particles: Particle
   });
   const countElement = document.getElementById('count');
   if (countElement) {
-    countElement.innerText = `${allParticles.length} particles`;
+    countElement.innerText = `${allParticles.length} particles. ${
+      allParticles.filter((p) => p.color === 'red').length
+    } red. ${allParticles.filter((p) => p.color === 'white').length} white.`;
   }
   requestAnimationFrame(() => update(ctx, rules));
 };
