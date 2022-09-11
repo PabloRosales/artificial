@@ -71,7 +71,7 @@ const createGroup = (ctx: CanvasRenderingContext2D, n: number, area: number, col
         nutrient: 1,
         reproduce: 0,
         children: 0,
-        size: START_PARTICLE_SIZE,
+        size: color === 'purple' ? START_PARTICLE_SIZE * 4 : START_PARTICLE_SIZE,
       }),
     );
   }
@@ -97,7 +97,7 @@ const move = (a: Particle, p2: Particle[]) => {
     foundCandidates = true;
 
     a.nutrient -= 0.0001;
-    if (a.color === 'white') {
+    if (a.color === 'red') {
       a.x += randomWalk();
       a.y += randomWalk();
     }
@@ -293,12 +293,9 @@ const run = async () => {
 
   const ctx = getContext2D();
 
-  const red = createGroup(ctx, 50, CANVAS_SIZE - 50, 'red');
+  const red = createGroup(ctx, 200, CANVAS_SIZE - 50, 'red');
   const white = createGroup(ctx, 200, CANVAS_SIZE - 50, 'white');
-  const green = createGroup(ctx, 100, CANVAS_SIZE - 50, 'green');
-  const yellow = createGroup(ctx, 50, CANVAS_SIZE - 50, 'yellow');
-  const purple = createGroup(ctx, 50, CANVAS_SIZE - 50, 'purple');
-  allParticles = [...white, ...red, ...green, ...yellow, ...purple];
+  allParticles = [...white, ...red];
 
   await update(ctx, async (particles: Particle[]) => {
     if (!paused) {
@@ -319,13 +316,22 @@ const run = async () => {
         if (p.nutrient <= 0) {
           p.alive = false;
         }
+
+        if (p.x <= 0) {
+          p.x = 0;
+        } else if (p.x >= CANVAS_SIZE) {
+          p.x = CANVAS_SIZE;
+        }
+
+        if (p.y <= 0) {
+          p.y = 0;
+        } else if (p.y >= CANVAS_SIZE) {
+          p.y = CANVAS_SIZE;
+        }
       }
       if (addRandomParticles && particles.length < 200) {
         particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'red'));
         particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'white'));
-        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'green'));
-        particles.push(...createGroup(ctx, 5, CANVAS_SIZE - 50, 'yellow'));
-        particles.push(...createGroup(ctx, 20, CANVAS_SIZE - 50, 'purple'));
       }
       if (speed > 0) {
         await new Promise((resolve) => setTimeout(resolve, speed));
