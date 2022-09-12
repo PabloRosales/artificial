@@ -13,8 +13,8 @@ export interface ParticleBase {
   alive: boolean;
 }
 
-export type RuleFunction = (particle: Particle) => Particle[];
-export type ForceFunction = (particle: Particle) => void;
+export type RuleFunction = (particle: Particle) => Particle;
+export type ForceFunction = (particle: Particle) => Particle;
 
 export interface Particle extends ParticleBase {
   id: number;
