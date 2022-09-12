@@ -4,9 +4,9 @@ extern crate graphics;
 extern crate glutin_window;
 extern crate opengl_graphics;
 
+use std::collections::HashMap;
 use piston::window::WindowSettings;
 use glutin_window::GlutinWindow as Window;
-use graphics::types::Width;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
@@ -14,7 +14,7 @@ use rand::{thread_rng, Rng};
 
 pub struct App {
   gl: GlGraphics,
-  particles: Vec<Particle>,
+  particles: HashMap<i32, Particle>,
 }
 
 pub struct Particle {
@@ -24,6 +24,7 @@ pub struct Particle {
   vx: f64,
   vy: f64,
   size: f64,
+  alive: bool,
   color: [f32; 4],
   rules: Vec<fn(p: Particle) -> Particle>,
   forces: Vec<fn(p: Particle) -> Particle>,
@@ -43,7 +44,7 @@ impl App {
     self.gl.draw(args.viewport(), |c, gl| {
       clear(BLACK, gl);
 
-      for p in &self.particles {
+      for p in self.particles.values() {
         let square = rectangle::square(0.0, 0.0, p.size);
         let transform2 = c
           .transform
@@ -56,6 +57,34 @@ impl App {
   }
 
   fn update(&mut self, args: &UpdateArgs) {
+    let mut particles: HashMap<i32, Particle> = HashMap::new();
+
+    for p in self.particles.values() {
+      let mut new_particle = Particle {
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        vx: p.vx,
+        vy: p.vy,
+        size: p.size,
+        alive: p.alive,
+        color: p.color,
+        rules: p.rules.clone(),
+        forces: p.forces.clone(),
+      };
+
+      for rule in &p.rules {
+        new_particle = rule(new_particle);
+      }
+
+      for force in &p.forces {
+        new_particle = force(new_particle);
+      }
+
+      particles.insert(p.id, new_particle);
+    }
+
+    self.particles = particles;
   }
 }
 
@@ -64,6 +93,41 @@ fn random_position(width: f64, height: f64, size: f64) -> (f64, f64) {
   let x = rng.gen_range((-width / 2.0 + size)..(width / 2.0 - size));
   let y = rng.gen_range((-height / 2.0 + size)..(height / 2.0 - size));
   (x, y)
+}
+
+fn generate_unique_id() -> i32 {
+  use std::time::{SystemTime, UNIX_EPOCH};
+  let start = SystemTime::now();
+  let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
+  since_the_epoch.as_secs() as i32
+}
+
+fn bounce(p: Particle, window_size: f64) -> Particle {
+  let mut p = p;
+  let (x, y) = (p.x, p.y);
+
+  if x > window_size / 2.0 || x < -window_size / 2.0 {
+    p.vx = -p.vx;
+  }
+
+  if y > window_size / 2.0 || y < -window_size / 2.0 {
+    p.vy = -p.vy;
+  }
+
+  p
+}
+
+fn gravity(p: Particle) -> Particle {
+  let mut p = p;
+  p.vy += 0.1;
+  p
+}
+
+fn move_particle(p: Particle) -> Particle {
+  let mut p = p;
+  p.x += p.vx;
+  p.y += p.vy;
+  p
 }
 
 fn main() {
@@ -75,21 +139,29 @@ fn main() {
     .build()
     .unwrap();
 
+
   let random_pos = random_position(800.0, 800.0, PARTICLE_SIZE);
 
-  let particles = vec![
-    Particle {
-      id: 0,
-      size: PARTICLE_SIZE,
-      x: random_pos.0,
-      y: random_pos.1,
-      vx: 0.0,
-      vy: 0.0,
-      color: RED,
-      rules: vec![],
-      forces: vec![],
-    },
-  ];
+  let mut particles: HashMap<i32, Particle> = HashMap::new();
+  let id = generate_unique_id();
+  let new_particle = Particle {
+    id,
+    size: PARTICLE_SIZE,
+    x: random_pos.0,
+    y: random_pos.1,
+    vx: 0.0,
+    vy: 0.0,
+    color: RED,
+    alive: true,
+    rules: vec![
+      |p| move_particle(p),
+      |p| bounce(p, 800.0)
+    ],
+    forces: vec![
+      |p| gravity(p)
+    ],
+  };
+  particles.insert(id, new_particle);
 
   let mut app = App {
     gl: GlGraphics::new(opengl),
