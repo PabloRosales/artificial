@@ -106,3 +106,4 @@ dist
 # Others
 .idea
 .parcel-cache
+target
