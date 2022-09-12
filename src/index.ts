@@ -7,7 +7,8 @@ import {
   clearScreen,
   createParticle,
   updateParticles,
-  Particle, CANVAS_SIZE,
+  Particle,
+  CANVAS_SIZE,
 } from './utils';
 
 const update = async () => {
